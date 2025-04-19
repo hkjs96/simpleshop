@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,13 +23,21 @@ public class ProductController {
 
     private final ProductService productService;
 
-    @Operation(summary = "상품 등록")
-    @PostMapping(consumes = "multipart/form-data")
-    public ResponseEntity<ProductResponse> create(
-            @RequestPart("info") @Valid ProductRequest request,
-            @RequestPart(value = "image", required = false) MultipartFile image,
-            HttpSession session) throws IOException {
-        return ResponseEntity.ok(productService.create(request, image, session));
+    @Operation(summary = "상품 등록 (정보만)")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request, HttpSession session) {
+        return ResponseEntity.ok(productService.create(request, session));
+    }
+
+    @Operation(summary = "상품 이미지 업로드")
+    @PostMapping(value = "/{productId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> uploadImage(
+            @PathVariable Long productId,
+            @RequestPart("image") MultipartFile image,
+            HttpSession session
+    ) throws IOException {
+        productService.updateImage(productId, image, session);
+        return ResponseEntity.ok("이미지 업로드 성공 (기존 이미지가 있다면 삭제됨)");
     }
 
     @Operation(summary = "상품 목록 조회")
@@ -44,13 +53,12 @@ public class ProductController {
     }
 
     @Operation(summary = "상품 수정")
-    @PutMapping(value = "/{id}", consumes = "multipart/form-data")
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> update(
             @PathVariable Long id,
-            @RequestPart("info") @Valid ProductUpdateRequest request,
-            @RequestPart(value = "image", required = false) MultipartFile image,
-            HttpSession session) throws IOException {
-        productService.update(id, request, image, session);
+            @RequestBody @Valid ProductUpdateRequest request,
+            HttpSession session) {
+        productService.update(id, request, session);
         return ResponseEntity.ok("수정 완료");
     }
 

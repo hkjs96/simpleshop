@@ -4,6 +4,7 @@ import com.example.simpleshop.domain.user.UserService;
 import com.example.simpleshop.dto.user.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,12 +25,19 @@ public class UserController {
         return ResponseEntity.ok(userService.signup(request));
     }
 
-    @Operation(summary = "로그인", description = "세션 기반으로 로그인합니다.")
+    @Operation(summary = "로그인", description = "세션 기반 로그인")
     @PostMapping("/login")
-    public ResponseEntity<String> login(@Valid @RequestBody UserLoginRequest request, HttpSession session) {
+    public ResponseEntity<String> login(@Valid @RequestBody UserLoginRequest request,
+                                        HttpSession session, HttpServletResponse response) {
         userService.login(request, session);
-        return ResponseEntity.ok("로그인 성공");
+
+        // 세션 ID 확인용 로그 (테스트용)
+        String sessionId = session.getId();
+        response.setHeader("Set-Cookie", "JSESSIONID=" + sessionId + "; Path=/; HttpOnly");
+
+        return ResponseEntity.ok("로그인 성공. 세션 ID: " + sessionId);
     }
+
 
     @Operation(summary = "로그아웃", description = "세션을 무효화하여 로그아웃합니다.")
     @PostMapping("/logout")
