@@ -5,13 +5,17 @@ import com.example.simpleshop.domain.user.UserRepository;
 import com.example.simpleshop.dto.product.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.servlet.http.HttpSession;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 
 @Service
@@ -55,13 +59,6 @@ public class ProductService {
         String imageUrl = saveImage(image);
         product.update(product.getName(), product.getDescription(), product.getPrice(), imageUrl);
 
-
-        // 변경사항을 즉시 데이터베이스에 반영
-        /*
-            flush() 메서드는 현재 영속성 컨텍스트의 변경 사항을 데이터베이스에 즉시 반영합니다. 이렇게 하면 트랜잭션이 커밋되기 전에도 업데이트가 데이터베이스에 반영됩니다.
-        */
-//        productRepository.flush();
-
         // 변경된 엔티티를 저장
         productRepository.save(product);
     }
@@ -72,6 +69,134 @@ public class ProductService {
 
     public ProductResponse findById(Long id) {
         return productRepository.findById(id).map(this::toDto).orElseThrow();
+    }
+
+    /**
+     * 모든 상품을 조회하고 이미지 데이터를 Base64로 인코딩하여 포함한 응답을 반환합니다.
+     * 프론트엔드 애플리케이션에서 별도의 이미지 요청 없이 상품 정보와 이미지를 함께 표시할 수 있습니다.
+     * 
+     * @return 이미지 데이터가 포함된 상품 목록
+     */
+    public List<ProductResponseWithImage> findAllWithImages() {
+        List<Product> products = productRepository.findAll();
+        List<ProductResponseWithImage> result = new ArrayList<>();
+        
+        for (Product product : products) {
+            ProductResponse baseResponse = toDto(product);
+            try {
+                if (product.getImageUrl() != null && !product.getImageUrl().isBlank()) {
+                    // 이미지 데이터와 콘텐츠 타입 가져오기
+                    ImageData imageData = getImageData(product);
+                    result.add(ProductResponseWithImage.fromProductResponse(
+                            baseResponse, 
+                            imageData.base64Data(), 
+                            imageData.contentType()
+                    ));
+                } else {
+                    // 이미지가 없는 경우
+                    result.add(ProductResponseWithImage.fromProductResponse(
+                            baseResponse, null, null
+                    ));
+                }
+            } catch (IOException e) {
+                // 이미지 처리 중 오류 발생 시 이미지 없이 반환
+                result.add(ProductResponseWithImage.fromProductResponse(
+                        baseResponse, null, null
+                ));
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * 특정 상품을 조회하고 이미지 데이터를 Base64로 인코딩하여 포함한 응답을 반환합니다.
+     * 
+     * @param id 상품 ID
+     * @return 이미지 데이터가 포함된 상품 정보
+     */
+    public ProductResponseWithImage findByIdWithImage(Long id) {
+        Product product = productRepository.findById(id).orElseThrow();
+        ProductResponse baseResponse = toDto(product);
+        
+        try {
+            if (product.getImageUrl() != null && !product.getImageUrl().isBlank()) {
+                // 이미지 데이터와 콘텐츠 타입 가져오기
+                ImageData imageData = getImageData(product);
+                return ProductResponseWithImage.fromProductResponse(
+                        baseResponse, 
+                        imageData.base64Data(), 
+                        imageData.contentType()
+                );
+            }
+        } catch (IOException e) {
+            // 이미지 처리 중 오류 발생 시 이미지 없이 반환
+        }
+        
+        // 이미지가 없거나 오류 발생 시
+        return ProductResponseWithImage.fromProductResponse(baseResponse, null, null);
+    }
+
+    /**
+     * 상품의 이미지 데이터를 Base64로 인코딩하여 반환하는 내부 메서드
+     * 
+     * @param product 상품 엔티티
+     * @return 이미지 데이터와 콘텐츠 타입을 포함한 레코드
+     * @throws IOException 이미지 파일 처리 중 오류 발생 시
+     */
+    private ImageData getImageData(Product product) throws IOException {
+        if (product.getImageUrl() == null || product.getImageUrl().isBlank()) {
+            return new ImageData(null, null);
+        }
+        
+        // "/images/filename.jpg" → "filename.jpg"
+        String filename = product.getImageUrl().substring(product.getImageUrl().lastIndexOf("/") + 1);
+        File imageFile = new File(getUploadDir(), filename);
+        
+        if (!imageFile.exists()) {
+            return new ImageData(null, null);
+        }
+        
+        // 이미지 파일의 MIME 타입 확인
+        String contentType = Files.probeContentType(imageFile.toPath());
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
+        
+        // 이미지 파일을 바이트 배열로 읽고 Base64로 인코딩
+        byte[] fileContent = Files.readAllBytes(imageFile.toPath());
+        String base64Data = Base64.getEncoder().encodeToString(fileContent);
+        
+        return new ImageData(base64Data, contentType);
+    }
+
+    /**
+     * 이미지 데이터와 콘텐츠 타입을 포함하는 내부 레코드
+     */
+    private record ImageData(String base64Data, String contentType) {}
+
+    public ImageDownloadResponse getProductImage(Long id) throws IOException {
+        Product product = productRepository.findById(id).orElseThrow();
+        
+        if (product.getImageUrl() == null || product.getImageUrl().isBlank()) {
+            throw new IllegalStateException("이미지가 없습니다.");
+        }
+        
+        // "/images/filename.jpg" → "filename.jpg"
+        String filename = product.getImageUrl().substring(product.getImageUrl().lastIndexOf("/") + 1);
+        File imageFile = new File(getUploadDir(), filename);
+        
+        if (!imageFile.exists()) {
+            throw new IllegalStateException("이미지 파일을 찾을 수 없습니다.");
+        }
+        
+        Resource resource = new FileSystemResource(imageFile);
+        String contentType = Files.probeContentType(imageFile.toPath());
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
+        
+        return new ImageDownloadResponse(resource, contentType, filename);
     }
 
     public void update(Long id, ProductUpdateRequest req, HttpSession session) {
@@ -108,7 +233,10 @@ public class ProductService {
     }
 
     private ProductResponse toDto(Product p) {
-        return new ProductResponse(p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getImageUrl(), p.getWriter().getId());
+        // 모든 이미지는 로컬에 저장되므로 isLocalImage는 항상 true
+        // 만약 클라우드 스토리지를 사용하는 경우 여기서 구분 로직을 추가할 수 있음
+        boolean isLocalImage = p.getImageUrl() != null && !p.getImageUrl().isBlank();
+        return new ProductResponse(p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getImageUrl(), isLocalImage, p.getWriter().getId());
     }
 
     private void deleteFileFromDisk(String imageUrl) {

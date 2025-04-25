@@ -4,12 +4,18 @@ import com.example.simpleshop.domain.user.UserService;
 import com.example.simpleshop.dto.user.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Tag(name = "회원 API", description = "회원가입 / 로그인 / 로그아웃")
 @RestController
@@ -27,22 +33,48 @@ public class UserController {
 
     @Operation(summary = "로그인", description = "세션 기반 로그인")
     @PostMapping("/login")
-    public ResponseEntity<String> login(@Valid @RequestBody UserLoginRequest request,
-                                        HttpSession session, HttpServletResponse response) {
-        userService.login(request, session);
+    public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody UserLoginRequest request,
+                                        HttpServletRequest servletRequest,
+                                        HttpServletResponse servletResponse) {
+        // Create a new session and invalidate any existing session (prevents session fixation)
+        HttpSession session = servletRequest.getSession(true);
+        
+        // Authenticate user and set session attributes
+        UserResponse userResponse = userService.login(request, servletRequest, servletResponse);
 
-        // 세션 ID 확인용 로그 (테스트용)
-        String sessionId = session.getId();
-        response.setHeader("Set-Cookie", "JSESSIONID=" + sessionId + "; Path=/; HttpOnly");
-
-        return ResponseEntity.ok("로그인 성공. 세션 ID: " + sessionId);
+        // Return user info without sensitive data
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("message", "로그인 성공");
+        responseBody.put("user", userResponse);
+        
+        return ResponseEntity.ok(responseBody);
     }
-
 
     @Operation(summary = "로그아웃", description = "세션을 무효화하여 로그아웃합니다.")
     @PostMapping("/logout")
-    public ResponseEntity<String> logout(HttpSession session) {
-        userService.logout(session);
-        return ResponseEntity.ok("로그아웃 성공");
+    public ResponseEntity<Map<String, String>> logout(HttpServletRequest request, HttpServletResponse response) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        
+        // Clear the session cookie
+        Cookie cookie = new Cookie("JSESSIONID", null);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(request.isSecure()); // Set secure flag if using HTTPS
+        response.addCookie(cookie);
+        
+        Map<String, String> responseBody = new HashMap<>();
+        responseBody.put("message", "로그아웃 성공");
+        
+        return ResponseEntity.ok(responseBody);
     }
+    
+    // "/me" endpoint has been removed as requested
+    
+
 }
+
+

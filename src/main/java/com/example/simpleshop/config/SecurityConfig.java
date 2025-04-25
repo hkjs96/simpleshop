@@ -11,6 +11,8 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 
 @Configuration
 @EnableWebSecurity
@@ -22,7 +24,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(AbstractHttpConfigurer::disable)
+            // CSRF configuration - disabled for API endpoints but could be enabled with proper configuration
+            .csrf(csrf -> csrf.disable())
+            
+            // Request authorization rules
             .authorizeHttpRequests(authorize -> authorize
                 // Swagger UI endpoints
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
@@ -33,17 +38,34 @@ public class SecurityConfig {
                 // Secure all other endpoints
                 .anyRequest().authenticated()
             )
-            .logout(logout -> logout
-                    .logoutUrl("/api/users/logout")
-                    .permitAll()
-            )
+            
+            // Session management configuration
             .sessionManagement(session -> session
-                    .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
-                    .maximumSessions(1) // 동시에 로그인 1개 제한 (선택)
+                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                    .maximumSessions(1)
+                    .expiredUrl("/login?expired")
             )
-            .addFilterBefore(sessionAuthenticationFilter, UsernamePasswordAuthenticationFilter.class) // 🔥 필터 등록
+            
+            // Custom filter for session-based authentication
+            .addFilterBefore(sessionAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            
+            // Disable form login and HTTP Basic
             .formLogin(AbstractHttpConfigurer::disable)
-            .httpBasic(AbstractHttpConfigurer::disable);
+            .httpBasic(AbstractHttpConfigurer::disable)
+            
+            // Logout configuration
+            .logout(logout -> logout
+                .logoutUrl("/api/users/logout")
+                .invalidateHttpSession(true)
+                .deleteCookies("JSESSIONID")
+                .clearAuthentication(true)
+                .permitAll()
+            );
+
+        // For H2 console (development only)
+        http.headers(headers ->
+                headers.frameOptions(frameOptions -> frameOptions.disable())
+        );
 
         return http.build();
     }
@@ -52,4 +74,10 @@ public class SecurityConfig {
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
+    
+    @Bean
+    public HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
+    }
 }
+

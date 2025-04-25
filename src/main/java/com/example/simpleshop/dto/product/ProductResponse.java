@@ -9,5 +9,7 @@ public record ProductResponse(
         @Schema(description = "설명") String description,
         @Schema(description = "가격") int price,
         @Schema(description = "이미지 URL") String imageUrl,
+        @Schema(description = "이미지가 로컬에 저장되어 있는지 여부") boolean isLocalImage,
         @Schema(description = "작성자 ID") Long writerId
 ) {}
+
