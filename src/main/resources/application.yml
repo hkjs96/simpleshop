@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: simpleshop
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  web:
+    resources:
+      static-locations: file:uploads/images/
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+    session:
+      cookie:
+        http-only: true
+        secure: false  # Set to true in production with HTTPS
+        same-site: lax
+        max-age: 3600  # 1 hour in seconds
+      timeout: 3600  # 1 hour in seconds
+
+server:
+  port: 8080
+  servlet:
+    session:
+      tracking-modes: cookie
+      cookie:
+        name: JSESSIONID
+        http-only: true
+        secure: false  # Set to true in production with HTTPS
+        path: /
+      timeout: 3600s  # 1 hour
+
+file:
+  upload-dir: uploads/images
+
+
+
