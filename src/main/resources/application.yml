@@ -53,5 +53,5 @@ file:
 cloud:
   aws:
     s3:
-      bucket: simple-s3
+      bucket: simpleshop-s3-bucket
 
