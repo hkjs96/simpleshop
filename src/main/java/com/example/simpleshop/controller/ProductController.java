@@ -2,10 +2,9 @@ package com.example.simpleshop.controller;
 
 import com.example.simpleshop.domain.product.ProductService;
 import com.example.simpleshop.dto.product.*;
+import com.example.simpleshop.dto.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -25,47 +24,45 @@ public class ProductController {
 
     @Operation(summary = "상품 등록 (정보만)")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request, HttpSession session) {
-        return ResponseEntity.ok(productService.create(request, session));
+    public ResponseEntity<ApiResponse<ProductResponse>> create(@RequestBody ProductRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(productService.create(request)));
     }
 
     @Operation(summary = "상품 이미지 업로드 (S3)")
     @PostMapping(value = "/{productId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<String> uploadImage(
+    public ResponseEntity<ApiResponse<String>> uploadImage(
             @PathVariable Long productId,
-            @RequestPart("image") MultipartFile image,
-            HttpSession session
+            @RequestPart("image") MultipartFile image
     ) throws IOException {
-        String imageUrl = productService.updateImage(productId, image, session);
-        return ResponseEntity.ok(imageUrl);
+        String imageUrl = productService.updateImage(productId, image);
+        return ResponseEntity.ok(ApiResponse.success(imageUrl));
     }
 
     @Operation(summary = "상품 목록 조회")
     @GetMapping
-    public ResponseEntity<List<ProductResponse>> findAll() {
-        return ResponseEntity.ok(productService.findAll());
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> findAll() {
+        return ResponseEntity.ok(ApiResponse.success(productService.findAll()));
     }
 
     @Operation(summary = "상품 상세 조회")
     @GetMapping("/{id}")
-    public ResponseEntity<ProductResponse> findById(@PathVariable Long id) {
-        return ResponseEntity.ok(productService.findById(id));
+    public ResponseEntity<ApiResponse<ProductResponse>> findById(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(productService.findById(id)));
     }
 
     @Operation(summary = "상품 수정")
     @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> update(
+    public ResponseEntity<ApiResponse<String>> update(
             @PathVariable Long id,
-            @RequestBody @Valid ProductUpdateRequest request,
-            HttpSession session) {
-        productService.update(id, request, session);
-        return ResponseEntity.ok("수정 완료");
+            @RequestBody ProductUpdateRequest request) {
+        productService.update(id, request);
+        return ResponseEntity.ok(ApiResponse.success("수정 완료"));
     }
 
     @Operation(summary = "상품 삭제")
     @DeleteMapping("/{id}")
-    public ResponseEntity<String> delete(@PathVariable Long id, HttpSession session) {
-        productService.delete(id, session);
-        return ResponseEntity.ok("삭제 완료");
+    public ResponseEntity<ApiResponse<String>> delete(@PathVariable Long id) {
+        productService.delete(id);
+        return ResponseEntity.ok(ApiResponse.success("삭제 완료"));
     }
 }

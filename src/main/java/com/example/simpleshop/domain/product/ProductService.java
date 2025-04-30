@@ -5,12 +5,14 @@ import com.example.simpleshop.domain.user.User;
 import com.example.simpleshop.domain.user.UserRepository;
 import com.example.simpleshop.dto.product.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @Service
 @RequiredArgsConstructor
@@ -20,8 +22,8 @@ public class ProductService {
     private final UserRepository userRepository;
     private final S3ImageService s3ImageService;
 
-    public ProductResponse create(ProductRequest req, HttpSession session) {
-        Long userId = (Long) session.getAttribute("USER_ID");
+    public ProductResponse create(ProductRequest req) {
+        Long userId = getCurrentUserId();
         User writer = userRepository.findById(userId).orElseThrow();
 
         Product product = Product.builder()
@@ -36,9 +38,10 @@ public class ProductService {
         return toDto(product);
     }
 
-    public String updateImage(Long productId, MultipartFile image, HttpSession session) throws IOException {
-        Long userId = (Long) session.getAttribute("USER_ID");
-        Product product = productRepository.findById(productId).orElseThrow();
+    public String updateImage(Long productId, MultipartFile image) throws IOException {
+        Long userId = getCurrentUserId();
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new NoSuchElementException("존재하지 않는 상품입니다."));
 
         if (!product.getWriter().getId().equals(userId)) {
             throw new IllegalStateException("작성자만 수정할 수 있습니다.");
@@ -60,12 +63,15 @@ public class ProductService {
     }
 
     public ProductResponse findById(Long id) {
-        return productRepository.findById(id).map(this::toDto).orElseThrow();
+        return productRepository.findById(id)
+                .map(this::toDto)
+                .orElseThrow(() -> new NoSuchElementException("해당 상품을 찾을 수 없습니다."));
     }
 
-    public void update(Long id, ProductUpdateRequest req, HttpSession session) {
-        Long userId = (Long) session.getAttribute("USER_ID");
-        Product product = productRepository.findById(id).orElseThrow();
+    public void update(Long id, ProductUpdateRequest req) {
+        Long userId = getCurrentUserId();
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("존재하지 않는 상품입니다."));
 
         if (!product.getWriter().getId().equals(userId)) {
             throw new IllegalStateException("작성자만 수정할 수 있습니다.");
@@ -75,9 +81,10 @@ public class ProductService {
         productRepository.save(product);
     }
 
-    public void delete(Long id, HttpSession session) {
-        Long userId = (Long) session.getAttribute("USER_ID");
-        Product product = productRepository.findById(id).orElseThrow();
+    public void delete(Long id) {
+        Long userId = getCurrentUserId();
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("존재하지 않는 상품입니다."));
 
         if (!product.getWriter().getId().equals(userId)) {
             throw new IllegalStateException("작성자만 삭제할 수 있습니다.");
@@ -93,5 +100,14 @@ public class ProductService {
     private ProductResponse toDto(Product p) {
         boolean isLocalImage = false; // S3 기반이므로 false
         return new ProductResponse(p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getImageUrl(), isLocalImage, p.getWriter().getId());
+    }
+
+    private Long getCurrentUserId() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof User user) {
+            return user.getId();
+        } else {
+            throw new IllegalStateException("로그인된 사용자를 확인할 수 없습니다.");
+        }
     }
 }
