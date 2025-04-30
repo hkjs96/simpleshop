@@ -1,5 +1,6 @@
 package com.example.simpleshop.domain.product;
 
+import com.example.simpleshop.domain.common.S3ImageService;
 import com.example.simpleshop.domain.user.User;
 import com.example.simpleshop.domain.user.UserRepository;
 import com.example.simpleshop.dto.product.*;
@@ -21,6 +22,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ProductService {
+
+    private final S3ImageService s3ImageService;
 
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
@@ -53,14 +56,29 @@ public class ProductService {
         }
 
         if (product.getImageUrl() != null) {
-            deleteFileFromDisk(product.getImageUrl());
+            s3ImageService.delete(product.getImageUrl());
         }
 
-        String imageUrl = saveImage(image);
+        String imageUrl = s3ImageService.upload(image);
         product.update(product.getName(), product.getDescription(), product.getPrice(), imageUrl);
 
         // 변경된 엔티티를 저장
         productRepository.save(product);
+    }
+
+    public void deleteImage(Long productId, HttpSession session) {
+        Long userId = (Long) session.getAttribute("USER_ID");
+        Product product = productRepository.findById(productId).orElseThrow();
+
+        if (!product.getWriter().getId().equals(userId)) {
+            throw new IllegalStateException("작성자만 삭제할 수 있습니다.");
+        }
+
+        if (product.getImageUrl() != null) {
+            s3ImageService.delete(product.getImageUrl());
+            product.update(product.getName(), product.getDescription(), product.getPrice(), null);
+            productRepository.save(product);
+        }
     }
 
     public List<ProductResponse> findAll() {
