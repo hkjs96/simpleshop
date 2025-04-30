@@ -7,8 +7,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,15 +29,15 @@ public class ProductController {
         return ResponseEntity.ok(productService.create(request, session));
     }
 
-    @Operation(summary = "상품 이미지 업로드")
+    @Operation(summary = "상품 이미지 업로드 (S3)")
     @PostMapping(value = "/{productId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> uploadImage(
             @PathVariable Long productId,
             @RequestPart("image") MultipartFile image,
             HttpSession session
     ) throws IOException {
-        productService.updateImage(productId, image, session);
-        return ResponseEntity.ok("이미지 업로드 성공 (기존 이미지가 있다면 삭제됨)");
+        String imageUrl = productService.updateImage(productId, image, session);
+        return ResponseEntity.ok(imageUrl);
     }
 
     @Operation(summary = "상품 목록 조회")
@@ -48,38 +46,10 @@ public class ProductController {
         return ResponseEntity.ok(productService.findAll());
     }
 
-    @Operation(summary = "상품 목록 조회 (이미지 데이터 포함)")
-    @GetMapping("/with-images")
-    public ResponseEntity<List<ProductResponseWithImage>> findAllWithImages() {
-        return ResponseEntity.ok(productService.findAllWithImages());
-    }
-
     @Operation(summary = "상품 상세 조회")
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> findById(@PathVariable Long id) {
         return ResponseEntity.ok(productService.findById(id));
-    }
-
-    @Operation(summary = "상품 상세 조회 (이미지 데이터 포함)")
-    @GetMapping("/{id}/with-image")
-    public ResponseEntity<ProductResponseWithImage> findByIdWithImage(@PathVariable Long id) {
-        return ResponseEntity.ok(productService.findByIdWithImage(id));
-    }
-
-    @Operation(summary = "상품 이미지 다운로드")
-    @GetMapping("/{id}/image")
-    public ResponseEntity<Resource> downloadImage(@PathVariable Long id) {
-        try {
-            ImageDownloadResponse downloadResponse = productService.getProductImage(id);
-            
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(downloadResponse.contentType()))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, 
-                            "attachment; filename=\"" + downloadResponse.filename() + "\"")
-                    .body(downloadResponse.resource());
-        } catch (IOException e) {
-            return ResponseEntity.notFound().build();
-        }
     }
 
     @Operation(summary = "상품 수정")
@@ -99,5 +69,3 @@ public class ProductController {
         return ResponseEntity.ok("삭제 완료");
     }
 }
-
-
