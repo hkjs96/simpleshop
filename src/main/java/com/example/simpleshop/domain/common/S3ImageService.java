@@ -24,7 +24,6 @@ public class S3ImageService {
                 .bucket(s3Bucket)
                 .key(filename)
                 .contentType(file.getContentType())
-                .acl(ObjectCannedACL.PUBLIC_READ)
                 .build();
 
         s3Client.putObject(putRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
