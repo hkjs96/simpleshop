@@ -60,7 +60,7 @@ public class UserControllerTest {
 
     @Test
     void login_ShouldReturnMessageAndUser() throws Exception {
-        when(userService.login(any(UserLoginRequest.class), any(), any())).thenReturn(userResponse);
+        when(userService.login(any(UserLoginRequest.class))).thenReturn(userResponse);
 
         mockMvc.perform(post("/api/users/login").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

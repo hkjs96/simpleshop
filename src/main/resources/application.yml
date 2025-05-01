@@ -50,5 +50,8 @@ server:
 file:
   upload-dir: uploads/images
 
-
+cloud:
+  aws:
+    s3:
+      bucket: simpleshop-s3-bucket
 
