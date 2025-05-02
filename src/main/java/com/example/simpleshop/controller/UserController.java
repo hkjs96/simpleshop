@@ -27,9 +27,16 @@ public class UserController {
 
     @Operation(summary = "로그인", description = "세션 기반 로그인")
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<UserResponse>> login(@Valid @RequestBody UserLoginRequest request) {
-        return ResponseEntity.ok(userService.login(request));
+    public ResponseEntity<ApiResponse<UserResponse>> login(@Valid @RequestBody UserLoginRequest request,
+                                                           HttpServletRequest httpRequest) {
+        ApiResponse<UserResponse> response = userService.login(request);
+
+        // 로그인 성공 시 세션에 사용자 ID 저장
+        httpRequest.getSession(true).setAttribute("USER_ID", response.getData().id());
+
+        return ResponseEntity.ok(response);
     }
+
 
     @Operation(summary = "로그아웃")
     @PostMapping("/logout")
