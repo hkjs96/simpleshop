@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,7 +27,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             // CSRF configuration - disabled for API endpoints but could be enabled with proper configuration
-            .csrf(csrf -> csrf.disable())
+            .csrf(AbstractHttpConfigurer::disable)
             
             // Request authorization rules
             .authorizeHttpRequests(authorize -> authorize
@@ -79,7 +80,7 @@ public class SecurityConfig {
 
         // For H2 console (development only)
         http.headers(headers ->
-                headers.frameOptions(frameOptions -> frameOptions.disable())
+                headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable)
         );
 
         return http.build();

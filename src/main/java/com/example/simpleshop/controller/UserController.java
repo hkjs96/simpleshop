@@ -36,11 +36,4 @@ public class UserController {
 
         return ResponseEntity.ok(response);
     }
-
-
-    @Operation(summary = "로그아웃")
-    @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<String>> logout(HttpServletRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("로그아웃 성공"));
-    }
 }
