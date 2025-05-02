@@ -41,9 +41,6 @@ public class UserController {
     @Operation(summary = "로그아웃")
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<String>> logout(HttpServletRequest request) {
-        if (request.getSession(false) != null) {
-            request.getSession(false).invalidate();
-        }
         return ResponseEntity.ok(ApiResponse.success("로그아웃 성공"));
     }
 }
