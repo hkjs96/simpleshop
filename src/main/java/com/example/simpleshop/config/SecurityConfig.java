@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -30,18 +31,20 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             
             // Request authorization rules
-            .authorizeHttpRequests(authorize -> authorize
-                // Swagger UI endpoints
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                // H2 console if needed during development
-                .requestMatchers("/h2-console/**").permitAll()
-                // Public endpoints
-                .requestMatchers("/api/users/signup", "/api/users/login").permitAll()
-                // Secure all other endpoints
-                .anyRequest().authenticated()
-            )
-            
-            // Session management configuration
+                .authorizeHttpRequests(auth -> auth
+                        // Swagger & H2 콘솔은 전체 허용
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/h2-console/**").permitAll()
+                        // 회원가입/로그인은 인증 없이 허용
+                        .requestMatchers("/api/users/signup", "/api/users/login").permitAll()
+                        // 상품 목록 및 상세 조회 (GET 요청) 전체 공개
+                        .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                        // 나머지 API 요청은 인증 필요 (상품 등록/수정/삭제, 마이페이지 등)
+                        .requestMatchers("/api/**").authenticated()
+                        // 나머지 모든 요청은 인증 필요
+                        .anyRequest().authenticated()
+                )
+
+                // Session management configuration
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                     .maximumSessions(1)
