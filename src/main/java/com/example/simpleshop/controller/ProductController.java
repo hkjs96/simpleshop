@@ -4,10 +4,12 @@ import com.example.simpleshop.domain.product.ProductService;
 import com.example.simpleshop.dto.product.*;
 import com.example.simpleshop.dto.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
@@ -44,11 +46,23 @@ public class ProductController {
     @Operation(summary = "상품 목록 조회 (페이징)")
     @GetMapping
     public ResponseEntity<ApiResponse<Page<ProductResponse>>> findAll(
-            @PageableDefault(size = 10) Pageable pageable,
+            @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
+            @RequestParam(value = "page", defaultValue = "0") int page,
+
+            @Parameter(description = "페이지 크기 (1~100 사이 권장)", example = "10")
+            @RequestParam(value = "size", defaultValue = "10") int size,
+
+            @Parameter(description = "정렬 기준 (latest | priceAsc | priceDesc)", example = "latest")
             @RequestParam(defaultValue = "latest") String sortBy
     ) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new IllegalArgumentException("page는 0 이상, size는 1~100 사이여야 합니다.");
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(ApiResponse.success(productService.findAll(pageable, sortBy)));
     }
+
 
     @Operation(summary = "상품 상세 조회")
     @GetMapping("/{id}")
