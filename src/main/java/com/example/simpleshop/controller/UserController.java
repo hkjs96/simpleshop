@@ -25,7 +25,17 @@ public class UserController {
         return ResponseEntity.ok(userService.signup(request));
     }
 
-    @Operation(summary = "로그인", description = "세션 기반 로그인")
+    @Operation(
+            summary = "로그인",
+            description = """
+        세션 기반 로그인 API입니다.
+
+        🔑 기본 사용자 테스트 계정:
+        - alice@example.com / password123
+        - bob@example.com / password123
+        - charlie@example.com / password123
+        """
+    )
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<UserResponse>> login(@Valid @RequestBody UserLoginRequest request,
                                                            HttpServletRequest httpRequest) {
