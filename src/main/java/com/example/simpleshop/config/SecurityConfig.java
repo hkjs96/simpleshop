@@ -1,5 +1,6 @@
 package com.example.simpleshop.config;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -59,7 +60,21 @@ public class SecurityConfig {
                 .invalidateHttpSession(true)
                 .deleteCookies("JSESSIONID")
                 .clearAuthentication(true)
-                .permitAll()
+                .logoutSuccessHandler((request, response, authentication) -> {
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+
+                    String json = """
+                                {
+                                  "success": true,
+                                  "data": [],
+                                  "message": "로그아웃 성공"
+                                }
+                                """;
+
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    response.getWriter().write(json);
+                })
             );
 
         // For H2 console (development only)
