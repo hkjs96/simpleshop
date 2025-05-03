@@ -2,7 +2,6 @@ package com.example.simpleshop.domain.product;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.springframework.data.annotation.Id;
 
 @Entity
 @Getter
