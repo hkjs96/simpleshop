@@ -4,8 +4,12 @@ import com.example.simpleshop.domain.product.ProductService;
 import com.example.simpleshop.dto.product.*;
 import com.example.simpleshop.dto.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,21 +32,37 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success(productService.create(request)));
     }
 
-    @Operation(summary = "상품 이미지 업로드 (S3)")
-    @PostMapping(value = "/{productId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ApiResponse<String>> uploadImage(
+    @Operation(summary = "상품 이미지 여러 개 업로드 (S3)")
+    @PostMapping(value = "/{productId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<List<String>>> uploadImages(
             @PathVariable Long productId,
-            @RequestPart("image") MultipartFile image
+            @RequestPart("images") List<MultipartFile> images
     ) throws IOException {
-        String imageUrl = productService.updateImage(productId, image);
-        return ResponseEntity.ok(ApiResponse.success(imageUrl));
+        List<String> imageUrls = productService.updateImages(productId, images);
+        return ResponseEntity.ok(ApiResponse.success(imageUrls));
     }
 
-    @Operation(summary = "상품 목록 조회")
+
+    @Operation(summary = "상품 목록 조회 (페이징)")
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> findAll() {
-        return ResponseEntity.ok(ApiResponse.success(productService.findAll()));
+    public ResponseEntity<ApiResponse<Page<ProductResponse>>> findAll(
+            @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
+            @RequestParam(value = "page", defaultValue = "0") int page,
+
+            @Parameter(description = "페이지 크기 (1~100 사이 권장)", example = "10")
+            @RequestParam(value = "size", defaultValue = "10") int size,
+
+            @Parameter(description = "정렬 기준 (latest | priceAsc | priceDesc)", example = "latest")
+            @RequestParam(defaultValue = "latest") String sortBy
+    ) {
+        if (page < 0 || size <= 0 || size > 100) {
+            throw new IllegalArgumentException("page는 0 이상, size는 1~100 사이여야 합니다.");
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.ok(ApiResponse.success(productService.findAll(pageable, sortBy)));
     }
+
 
     @Operation(summary = "상품 상세 조회")
     @GetMapping("/{id}")
@@ -65,4 +85,15 @@ public class ProductController {
         productService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("삭제 완료"));
     }
+
+    @Operation(summary = "상품 이미지 삭제")
+    @DeleteMapping("/products/{productId}/images/{imageId}")
+    public ResponseEntity<ApiResponse<String>> deleteImage(
+            @PathVariable Long productId,
+            @PathVariable Long imageId
+    ) {
+        productService.deleteImage(productId, imageId);
+        return ResponseEntity.ok(ApiResponse.success("삭제 성공"));
+    }
+
 }

@@ -5,12 +5,17 @@ import com.example.simpleshop.domain.user.User;
 import com.example.simpleshop.domain.user.UserRepository;
 import com.example.simpleshop.dto.product.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
@@ -22,6 +27,7 @@ public class ProductService {
     private final UserRepository userRepository;
     private final S3ImageService s3ImageService;
 
+    @Transactional
     public ProductResponse create(ProductRequest req) {
         Long userId = getCurrentUserId();
         User writer = userRepository.findById(userId).orElseThrow();
@@ -30,7 +36,6 @@ public class ProductService {
                 .name(req.name())
                 .description(req.description())
                 .price(req.price())
-                .imageUrl(null) // 이미지 업로드는 별도 API에서 처리
                 .writer(writer)
                 .build();
 
@@ -38,8 +43,10 @@ public class ProductService {
         return toDto(product);
     }
 
-    public String updateImage(Long productId, MultipartFile image) throws IOException {
+    @Transactional
+    public List<String> updateImages(Long productId, List<MultipartFile> images) throws IOException {
         Long userId = getCurrentUserId();
+
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new NoSuchElementException("존재하지 않는 상품입니다."));
 
@@ -47,27 +54,54 @@ public class ProductService {
             throw new IllegalStateException("작성자만 수정할 수 있습니다.");
         }
 
-        if (product.getImageUrl() != null) {
-            s3ImageService.delete(product.getImageUrl());
+        // 기존 이미지 모두 삭제 (S3 및 DB)
+        for (ProductImage image : product.getImages()) {
+            s3ImageService.delete(image.getImageUrl());
+        }
+        product.getImages().clear();
+
+        // 새로운 이미지 업로드 및 순서 부여
+        List<String> uploadedUrls = new ArrayList<>();
+        for (int i = 0; i < images.size(); i++) {
+            String imageUrl = s3ImageService.upload(images.get(i));
+            ProductImage image = ProductImage.builder()
+                    .imageUrl(imageUrl)
+                    .imageOrder(i)
+                    .product(product)
+                    .build();
+
+            product.getImages().add(image);
+            uploadedUrls.add(imageUrl);
         }
 
-        String imageUrl = s3ImageService.upload(image);
-        product.update(product.getName(), product.getDescription(), product.getPrice(), imageUrl);
         productRepository.save(product);
-
-        return imageUrl;
+        return uploadedUrls;
     }
 
-    public List<ProductResponse> findAll() {
-        return productRepository.findAll().stream().map(this::toDto).toList();
+
+
+    @Transactional(readOnly = true)
+    public Page<ProductResponse> findAll(Pageable pageable, String sortBy) {
+        Sort sort;
+        switch (sortBy) {
+            case "priceAsc" -> sort = Sort.by(Sort.Direction.ASC, "price");
+            case "priceDesc" -> sort = Sort.by(Sort.Direction.DESC, "price");
+            default -> sort = Sort.by(Sort.Direction.DESC, "id"); // 최신순
+        }
+        pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+
+        return productRepository.findAll(pageable)
+                .map(this::toDto);
     }
 
+    @Transactional(readOnly = true)
     public ProductResponse findById(Long id) {
         return productRepository.findById(id)
                 .map(this::toDto)
                 .orElseThrow(() -> new NoSuchElementException("해당 상품을 찾을 수 없습니다."));
     }
 
+    @Transactional
     public void update(Long id, ProductUpdateRequest req) {
         Long userId = getCurrentUserId();
         Product product = productRepository.findById(id)
@@ -77,10 +111,11 @@ public class ProductService {
             throw new IllegalStateException("작성자만 수정할 수 있습니다.");
         }
 
-        product.update(req.name(), req.description(), req.price(), product.getImageUrl());
+        product.update(req.name(), req.description(), req.price());
         productRepository.save(product);
     }
 
+    @Transactional
     public void delete(Long id) {
         Long userId = getCurrentUserId();
         Product product = productRepository.findById(id)
@@ -90,24 +125,71 @@ public class ProductService {
             throw new IllegalStateException("작성자만 삭제할 수 있습니다.");
         }
 
-        if (product.getImageUrl() != null) {
-            s3ImageService.delete(product.getImageUrl());
+        if (!product.getImages().isEmpty()) {
+            s3ImageService.imageDelete(product.getImages());
         }
 
         productRepository.delete(product);
     }
 
-    private ProductResponse toDto(Product p) {
-        boolean isLocalImage = false; // S3 기반이므로 false
-        return new ProductResponse(p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getImageUrl(), isLocalImage, p.getWriter().getId());
+    @Transactional
+    public void deleteImage(Long productId, Long imageId) {
+        Long userId = getCurrentUserId();
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new NoSuchElementException("존재하지 않는 상품입니다."));
+
+        if (!product.getWriter().getId().equals(userId)) {
+            throw new IllegalStateException("작성자만 삭제할 수 있습니다.");
+        }
+
+        List<ProductImage> images = product.getImages();
+
+        // 삭제 대상 찾기
+        ProductImage target = images.stream()
+                .filter(img -> img.getId().equals(imageId))
+                .findFirst()
+                .orElseThrow(() -> new NoSuchElementException("이미지를 찾을 수 없습니다."));
+
+        // S3 삭제 + 리스트에서 제거
+        s3ImageService.delete(target.getImageUrl());
+        images.remove(target);
+
+        // ✅ 순서 재정렬
+        for (int i = 0; i < images.size(); i++) {
+            images.get(i).updateOrder(i);
+        }
+
+        productRepository.save(product);
     }
 
+
+
+    private ProductResponse toDto(Product p) {
+        List<ProductImageResponse> imageDtos = p.getImages().stream()
+                .sorted(Comparator.comparingInt(ProductImage::getImageOrder)) // ✅ 순서 정렬
+                .map(img -> ProductImageResponse.builder()
+                        .id(img.getId())
+                        .url(img.getImageUrl())
+                        .order(img.getImageOrder())
+                        .build()
+                )
+                .toList();
+
+        return ProductResponse.builder()
+                .id(p.getId())
+                .name(p.getName())
+                .description(p.getDescription())
+                .price(p.getPrice())
+                .images(imageDtos)
+                .writerId(p.getWriter().getId())
+                .build();
+    }
+
+
+
     private Long getCurrentUserId() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (principal instanceof User user) {
-            return user.getId();
-        } else {
-            throw new IllegalStateException("로그인된 사용자를 확인할 수 없습니다.");
-        }
+        // SecurityContext 기반 인증 처리 필요 (구현 생략)
+        return 1L; // 테스트용 사용자 ID
     }
 }

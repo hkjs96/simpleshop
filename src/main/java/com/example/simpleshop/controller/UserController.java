@@ -25,18 +25,25 @@ public class UserController {
         return ResponseEntity.ok(userService.signup(request));
     }
 
-    @Operation(summary = "로그인", description = "세션 기반 로그인")
-    @PostMapping("/login")
-    public ResponseEntity<ApiResponse<UserResponse>> login(@Valid @RequestBody UserLoginRequest request) {
-        return ResponseEntity.ok(userService.login(request));
-    }
+    @Operation(
+            summary = "로그인",
+            description = """
+        세션 기반 로그인 API입니다.
 
-    @Operation(summary = "로그아웃")
-    @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<String>> logout(HttpServletRequest request) {
-        if (request.getSession(false) != null) {
-            request.getSession(false).invalidate();
-        }
-        return ResponseEntity.ok(ApiResponse.success("로그아웃 성공"));
+        🔑 기본 사용자 테스트 계정:
+        - alice@example.com / password123
+        - bob@example.com / password123
+        - charlie@example.com / password123
+        """
+    )
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<UserResponse>> login(@Valid @RequestBody UserLoginRequest request,
+                                                           HttpServletRequest httpRequest) {
+        ApiResponse<UserResponse> response = userService.login(request);
+
+        // 로그인 성공 시 세션에 사용자 ID 저장
+        httpRequest.getSession(true).setAttribute("USER_ID", response.getData().id());
+
+        return ResponseEntity.ok(response);
     }
 }
