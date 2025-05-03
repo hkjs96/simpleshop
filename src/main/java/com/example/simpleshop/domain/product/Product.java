@@ -23,7 +23,7 @@ public class Product {
     private int price;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("sortOrder ASC") // ✅ 자동 정렬
+    @OrderBy("imageOrder ASC") // ✅ 자동 정렬
     private List<ProductImage> images = new ArrayList<>();
 
 
