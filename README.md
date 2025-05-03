@@ -1,131 +1,131 @@
-# 세션 기반 인증(SPA) 예제 프로젝트
+# 🛒 SimpleShop - 세션 기반 쇼핑몰 API
 
-Spring Boot 백엔드와 React 프론트엔드를 분리하여 안전한 세션 기반 인증을 구현한 예제입니다. 제품 관리 기능(이미지 업로드·조회)도 포함되어 있습니다.
-
----
-
-## 🔑 주요 기능
-
-- **REST API `/api/users/login`**: 이메일/비밀번호로 로그인
-- **세션 관리**: JSESSIONID 쿠키로 인증 유지
-- **세션 고정 공격 방어**: 로그인 시 세션 재생성
-- **CORS 설정**: React(`http://localhost:3000`)와 통신 지원
-- **보안 쿠키**: HttpOnly, SameSite
-- **제품 관리**: 이미지 업로드/다운로드 및 base64 인코딩 지원
+Spring Boot 기반으로 로그인부터 상품 등록, 다중 이미지 업로드, Swagger 문서화까지 구현한 실전형 REST API 백엔드 프로젝트입니다.
 
 ---
 
-## 📦 기술 스택
+## 🎯 프로젝트 목적
 
-- **백엔드**: Java 17, Spring Boot 3.x, Spring Security
-- **프론트엔드**: React 18, Fetch API
-- **데이터베이스**: H2(테스트), MySQL/MariaDB
+**클라우드 인프라 경험 기반의 백엔드 전향**을 목표로, 실무 서비스 구성 요소인 인증/인가, 이미지 처리, RESTful 설계, 문서화 등을 직접 구현하며 백엔드 개발 역량을 강화했습니다.
 
----
-
-## ▶️ 인증 흐름
-
-1. 클라이언트가 `/api/users/login`로 로그인 요청
-2. 서버에서 사용자 검증 후 세션 생성
-3. `JSESSIONID` HttpOnly 쿠키 반환
-4. 이후 요청에 쿠키 자동 포함
-5. 필터(`SessionAuthenticationFilter`)에서 세션 유효성 검사
+- 세션 인증 및 스프링 시큐리티 흐름 이해
+- S3 업로드 및 IAM Role 연동 구조 구현
+- Swagger 3.0 기반 문서화 및 테스트 자동화
+- 도메인 중심 구조와 API 설계 패턴 적용
 
 ---
 
-## ⚙️ 백엔드 설정
+## 🪞 회고 (Retrospective)
 
-### CORS 설정 (예시)
-```java
-@Configuration
-public class WebConfig implements WebMvcConfigurer {
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
-                .allowedOrigins("http://localhost:3000")
-                .allowCredentials(true)
-                .allowedMethods("GET", "POST", "PUT", "DELETE");
-    }
-}
-```
-
-### 쿠키 설정 (예시)
-```java
-private void configureCookie(HttpServletResponse res, HttpSession session) {
-    Cookie cookie = new Cookie("JSESSIONID", session.getId());
-    cookie.setPath("/");
-    cookie.setHttpOnly(true);
-    cookie.setMaxAge(-1);
-    // production 환경에서는 아래 옵션 활성화
-    // cookie.setSecure(true);
-    // cookie.setAttribute("SameSite", "Lax");
-    res.addCookie(cookie);
-}
-```
+- **세션 인증을 수동 구현하며** Spring Security의 흐름을 체득
+- S3 이미지 업로드를 **IAM Role 방식으로 구성**, 보안과 운영까지 고려
+- **다중 이미지 처리 + 순서 보장/삭제 기능 구현**을 통해 실무에 가까운 API 설계 경험
+- Swagger 문서에 쿠키 인증(JSESSIONID)을 연동하여 **프론트 협업을 위한 API 테스트 환경 구성**
+- **페이징 + 정렬 기능 구현**으로 실제 데이터 API 설계 패턴을 습득
 
 ---
 
-## 🚀 프론트엔드 통합 가이드
+## 📌 주요 기능
 
-### 로그인
-```js
-async function login(email, password) {
-  const res = await fetch("http://localhost:8080/api/users/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-    credentials: "include"
-  });
-  if (!res.ok) throw new Error("로그인 실패");
-  return await res.json();
-}
-```
+| 기능 | 설명 |
+|------|------|
+| ✅ 회원가입 & 로그인 | 세션 기반 인증 처리 (JSESSIONID) |
+| ✅ 세션 인증 처리 | 로그인 후 API 접근 시 세션 기반 인증 필터 적용 |
+| ✅ 상품 CRUD | 작성자만 수정/삭제 가능 |
+| ✅ 이미지 업로드 | AWS S3 기반 다중 이미지 업로드 (URL 반환) |
+| ✅ 이미지 삭제 | 단일 이미지 삭제 + 자동 순서 재정렬 |
+| ✅ 페이징 및 정렬 | 최신순, 가격순 정렬 옵션 제공 |
+| ✅ Swagger 문서화 | Springdoc OpenAPI 3.0 기반 UI 자동 생성 |
 
-### 인증된 요청
-```js
-async function fetchProtected(url) {
-  const res = await fetch(url, { credentials: "include" });
-  if (res.status === 401) window.location.href = "/login";
-  if (!res.ok) throw new Error("요청 실패");
-  return await res.json();
-}
-```
+---
 
-### 로그아웃
-```js
-async function logout() {
-  const res = await fetch("http://localhost:8080/api/users/logout", {
-    method: "POST",
-    credentials: "include"
-  });
-  if (!res.ok) throw new Error("로그아웃 실패");
-  window.location.href = "/login";
+## 🛠️ 기술 스택
+
+| 분류 | 기술 |
+|------|------|
+| Framework | Spring Boot 3.x, Spring Security, Spring Web, JPA (Hibernate) |
+| 인증 | 세션 기반 인증 (HttpSession + Cookie) |
+| DB | H2, MariaDB |
+| 파일 저장소 | AWS S3 (IAM Role 연동) |
+| 문서화 | Swagger UI (springdoc-openapi 3.x) |
+| 테스트 도구 | Postman, Swagger UI |
+| 개발 도구 | IntelliJ, Gradle, Git |
+
+---
+
+## 🔐 인증 구조 (Session-based)
+
+```text
+[Login]
+→ POST /api/users/login
+→ 서버 세션 생성 + JSESSIONID 발급 (HttpOnly Cookie)
+
+[인증 필터 작동]
+→ 모든 요청에 쿠키 포함
+→ 세션 인증 필터(SessionFilter)가 사용자 ID 검증
+
+[Logout]
+→ POST /api/users/logout
+→ 세션 무효화
+````
+
+> Swagger UI에서 `cookie: JSESSIONID`를 수동으로 입력하여 테스트 가능
+
+---
+
+## 📷 이미지 처리 구조
+
+* **다중 업로드** 지원 (`POST /api/products/{id}/images`)
+* 업로드 시 순서 자동 지정 (`imageOrder`)
+* 삭제 시 순서 자동 재정렬
+* S3에서 `public-read` URL 반환 → 직접 표시 가능
+
+### 상품 조회 예시
+
+```json
+{
+  "id": 1,
+  "name": "테스트 상품",
+  "images": [
+    { "id": 10, "url": "https://.../img1.jpg", "order": 0 },
+    { "id": 11, "url": "https://.../img2.jpg", "order": 1 }
+  ]
 }
 ```
 
 ---
 
-## 🖼️ 제품 이미지 처리 방식 비교
+## 🧪 실행 방법
 
-| 방식       | 설명                                      | 장점                               | 단점                        |
-|-----------|-----------------------------------------|-----------------------------------|----------------------------|
-| 전통 방식 | 제품 정보와 이미지를 별도 endpoint로 호출    | 큰 파일에 유리, 페이로드 작음       | API 호출 수 증가           |
-| 통합 방식 | 제품 정보에 base64 이미지 포함            | 호출 수 감소, 코드 단순화          | 페이로드 33% 증가          |
+1. `application.yml` 에 다음 항목 설정
+
+   ```yaml
+   file:
+     upload-dir: uploads/
+   cloud:
+     aws:
+       s3:
+         bucket: your-bucket-name
+   ```
+2. 로컬 서버 실행: `./gradlew bootRun`
+   - 8080 포트 사용시 제거
+     - `ID=$(lsof -ti :8080)` -> `[ -n "$PID" ] && kill "$PID"`
+3. Swagger 문서 확인: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+---
+
+## 📂 디렉토리 구조 (요약)
+
+```
+src/main/java/com/example/simpleshop
+├── config                 # Security, Swagger, S3 설정
+├── controller             # User, Product API 컨트롤러
+├── domain
+│   ├── product            # Product, ProductImage 엔티티 및 서비스
+│   └── user               # User 엔티티 및 인증 서비스
+├── dto                   # Request/Response DTOs
+```
 
 ---
 
-## 📝 테스트
 
-- `UserControllerTest`: 로그인·로그아웃·세션 관리 검증
-- `SecurityConfigTest`: 시큐리티 설정·CORS 검증
-- `ProductControllerTest`: 제품 조회·이미지 처리 검증
-
----
-
-## 🔔 주의 사항
-
-1. **HTTPS** 환경에서는 `cookie.setSecure(true)` 활성화
-2. 배포 시 CORS 허용 도메인 수정
-3. **CSRF 보호** 추가 검토 (현재 API용 비활성)
-4. 대용량 이미지의 경우 CDN 활용 권장
 
