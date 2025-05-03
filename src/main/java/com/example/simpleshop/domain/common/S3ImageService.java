@@ -1,5 +1,6 @@
 package com.example.simpleshop.domain.common;
 
+import com.example.simpleshop.domain.product.ProductImage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -10,6 +11,7 @@ import software.amazon.awssdk.services.s3.model.ObjectCannedACL;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
+import java.util.List;
 
 @RequiredArgsConstructor
 @Service
@@ -29,6 +31,12 @@ public class S3ImageService {
         s3Client.putObject(putRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
 
         return "https://" + s3Bucket + ".s3.ap-northeast-2.amazonaws.com/" + filename;
+    }
+
+    public void imageDelete(List<ProductImage> productImages) {
+        productImages.stream()
+                .map(ProductImage::getImageUrl)
+                .forEach(this::delete);
     }
 
     public void delete(String imageUrl) {

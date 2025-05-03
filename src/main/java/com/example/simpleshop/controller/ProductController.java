@@ -6,18 +6,17 @@ import com.example.simpleshop.dto.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
 @Tag(name = "상품 API", description = "상품 등록/조회/수정/삭제")
 @RestController
@@ -33,15 +32,16 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success(productService.create(request)));
     }
 
-    @Operation(summary = "상품 이미지 업로드 (S3)")
-    @PostMapping(value = "/{productId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ApiResponse<String>> uploadImage(
+    @Operation(summary = "상품 이미지 여러 개 업로드 (S3)")
+    @PostMapping(value = "/{productId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<List<String>>> uploadImages(
             @PathVariable Long productId,
-            @RequestPart("image") MultipartFile image
+            @RequestPart("images") List<MultipartFile> images
     ) throws IOException {
-        String imageUrl = productService.updateImage(productId, image);
-        return ResponseEntity.ok(ApiResponse.success(imageUrl));
+        List<String> imageUrls = productService.updateImages(productId, images);
+        return ResponseEntity.ok(ApiResponse.success(imageUrls));
     }
+
 
     @Operation(summary = "상품 목록 조회 (페이징)")
     @GetMapping
@@ -85,4 +85,15 @@ public class ProductController {
         productService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("삭제 완료"));
     }
+
+    @Operation(summary = "상품 이미지 삭제")
+    @DeleteMapping("/products/{productId}/images/{imageId}")
+    public ResponseEntity<ApiResponse<String>> deleteImage(
+            @PathVariable Long productId,
+            @PathVariable Long imageId
+    ) {
+        productService.deleteImage(productId, imageId);
+        return ResponseEntity.ok(ApiResponse.success("삭제 성공"));
+    }
+
 }

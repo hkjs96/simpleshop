@@ -4,6 +4,9 @@ import com.example.simpleshop.domain.user.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -19,24 +22,25 @@ public class Product {
 
     private int price;
 
-    private String imageUrl;
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC") // ✅ 자동 정렬
+    private List<ProductImage> images = new ArrayList<>();
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     private User writer;
 
     @Builder
-    public Product(String name, String description, int price, String imageUrl, User writer) {
+    public Product(String name, String description, int price, User writer) {
         this.name = name;
         this.description = description;
         this.price = price;
-        this.imageUrl = imageUrl;
         this.writer = writer;
     }
 
-    public void update(String name, String description, int price, String imageUrl) {
+    public void update(String name, String description, int price) {
         this.name = name;
         this.description = description;
         this.price = price;
-        this.imageUrl = imageUrl;
     }
 }
