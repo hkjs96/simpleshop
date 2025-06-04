@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import org.springframework.http.MediaType;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -39,11 +41,22 @@ class SecurityConfigTest {
     @Test
     void whenAccessingPublicEndpoint_thenSuccess() throws Exception {
         // Test signup endpoint
-        mockMvc.perform(get("/api/users/signup"))
+        mockMvc.perform(post("/api/users/signup")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"email\":\"signup@example.com\"," +
+                                "\"password\":\"password123\"," +
+                                "\"nickname\":\"tester\"}"))
                 .andExpect(status().isOk());
-        
+
         // Test login endpoint
-        mockMvc.perform(get("/api/users/login"))
+        mockMvc.perform(post("/api/users/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"email\":\"alice@example.com\"," +
+                                "\"password\":\"password123\"}"))
                 .andExpect(status().isOk());
     }
     
