@@ -87,7 +87,7 @@ public class ProductController {
     }
 
     @Operation(summary = "상품 이미지 삭제")
-    @DeleteMapping("/products/{productId}/images/{imageId}")
+    @DeleteMapping("/{productId}/images/{imageId}")
     public ResponseEntity<ApiResponse<String>> deleteImage(
             @PathVariable Long productId,
             @PathVariable Long imageId
